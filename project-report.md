@@ -2,263 +2,200 @@
 
 ## Project Overview
 
-Successfully implemented persistence for the poll application using Java Persistence API (JPA) with Hibernate ORM and an H2 in-memory database. The application models polls, users, vote options, and votes with proper entity relationships. The implementation ensures data integrity through bidirectional mappings and cascading operations.
+This assignment extends the poll application by integrating **Redis (Valkey)** as an in-memory data store.
+We successfully installed Redis locally, verified its operation through the CLI (`redis-cli`), and explored Redis datatypes such as **Strings**, **Sets**, and **Hashes**.
 
-Additionally, adapted frontend and backend integration to fully support `Long`-based IDs and fixed duplication issues with vote options.
+Two specific use cases were implemented and tested:
+
+1. **Tracking logged-in users** using Redis Sets.
+2. **Storing and updating poll vote counts** using Redis Hashes.
+
+Additionally, we reproduced these same tests in **Java** using the Jedis library, ensuring that the application can interact programmatically with Redis.
 
 ---
 
 ## Technical Problems Encountered and Solutions
 
-### 1. **Entity ID Type Mismatch**
+### 1. **Missing Jedis Dependency**
 
-**Problem**: My project from Assigment 3 used `String` as entity IDs (set via UUIDs in `PollManager`), which conflicted with JPA’s need for numeric auto-generated primary keys.
+**Problem**: The code could not resolve `redis.clients.jedis` imports when implementing the Java tests.
 
-**Solution**: Changed all entity IDs from `String` to `Long` and annotated them as:
+**Solution**: Added Jedis as a dependency in `build.gradle`:
 
-```java
-@Id
-@GeneratedValue(strategy = GenerationType.IDENTITY)
-private Long id;
+```groovy
+implementation 'redis.clients:jedis:6.2.0'
 ```
 
-Also updated the frontend so that IDs are treated as numbers (`Number(...)`) instead of `String(...)`, ensuring API requests and responses matched the new backend logic.
+Then refreshed Gradle to fetch the dependency.
 
 ---
 
-### 2. **Missing `poll` Field in `Vote`**
+### 2. **Verifying Redis Server Availability**
 
-**Problem**: Hibernate reported:
+**Problem**: Tests failed when Redis was not running.
 
+**Solution**: Ensured Redis server was started and accessible at `localhost:6379` before running CLI or Java tests. Verified using:
+
+```bash
+redis-cli PING
 ```
-Collection 'Poll.votes' is 'mappedBy' a property named 'poll' which does not exist
-```
-
-because the `Vote` entity lacked a back-reference to `Poll`.
-
-**Solution**: Added the missing relationship:
-
-```java
-@ManyToOne
-private Poll poll;
-```
-
----
-
-### 3. **Unmapped `VoteOption` ↔ `Vote` Relationship**
-
-**Problem**: Votes were not properly linked to vote options, preventing correct schema generation.
-
-**Solution**: Established a bidirectional mapping:
-
-```java
-// In VoteOption.java
-@OneToMany(mappedBy = "votesOn", cascade = CascadeType.ALL, orphanRemoval = true)
-private Set<Vote> votes = new LinkedHashSet<>();
-
-// In Vote.java
-@ManyToOne
-private VoteOption votesOn;
-```
-
----
-
-### 4. **Delete Poll Ownership Issue**
-
-**Problem**: When switching between users, deletion of polls was incorrectly tied to the last created user, instead of the currently selected user.
-
-**Solution**: Fixed logic in `PollManager` to correctly check poll ownership against the chosen user rather than always using the last created one.
-
----
-
-### 5. **Duplicate Vote Options in API Responses**
-
-**Problem**: When fetching polls, each vote option appeared twice: once without an ID/poll reference, and once with the correct values.
-
-**Solution**: Cleaned up the poll–voteOption relationship management so that vote options are only persisted through the `Poll` entity. This ensured that only the managed, persisted instances appear in responses.
+Expected response: `PONG`.
 
 ---
 
 ## Changes made to the base project
 
-We started from a base project without persistence annotations and IDs defined as `String`.
-To adapt the project to JPA, the following changes were applied:
+* Added **Jedis dependency** to `build.gradle` for Redis integration.
+* Created a new test class `RedisUseCaseTests` under `src/test/java/no/ntnu/dat250/expass5/`.
+* This class replicates the CLI Redis operations for Use Case 1 (tracking logged-in users) and Use Case 2 (poll vote counts).
 
-### General
-
-* Added **JPA annotations** (`@Entity`, `@Id`, `@GeneratedValue`, `@OneToMany`, `@ManyToOne`, `@JoinColumn`) across the entity classes.
-* Changed entity IDs from `String` to `Long` with **auto-generated values** using:
-
-  ```java
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
-  ```
-* Imported the necessary JPA classes from `jakarta.persistence.*`.
-* Updated the **frontend code** to use numeric IDs instead of strings when sending/receiving data.
+No changes were required in the existing poll application source code yet, since this step focuses only on testing Redis basics.
 
 ---
 
-### Poll.java
+## Redis Tests and Use Cases
 
-* Added `@Entity` to mark the class as a JPA entity.
-* Changed `id` field from `String` to `Long` with `@Id` and `@GeneratedValue`.
-* Added two bidirectional relationships:
+### Use Case 1: Keep Track of Logged-In Users (Set datatype)
 
-  ```java
-  @OneToMany(mappedBy = "poll", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<VoteOption> options = new HashSet<>();
+* **Goal**: Use Redis Sets to maintain a collection of currently logged-in users.
 
-  @OneToMany(mappedBy = "poll", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<Vote> votes = new HashSet<>();
-  ```
+* **Explanation**:
 
----
+    * A `Set` is ideal because it prevents duplicates and allows efficient add/remove operations.
+    * We can add users when they log in (`SADD`), remove them when they log off (`SREM`), list all logged-in users (`SMEMBERS`), and check if a user is currently logged in (`SISMEMBER`).
 
-### VoteOption.java
+* **Commands and Results**:
 
-* Added `@Entity`.
-* Added `id` field with `@Id` and `@GeneratedValue`.
-* Added relationship to `Poll`:
+```
+127.0.0.1:6379> SADD loggedin alice
+(integer) 1
 
-  ```java
-  @ManyToOne
-  private Poll poll;
-  ```
-* Added relationship to `Vote`:
+127.0.0.1:6379> SADD loggedin bob
+(integer) 1
 
-  ```java
-  @OneToMany(mappedBy = "votesOn", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<Vote> votes = new LinkedHashSet<>();
-  ```
+127.0.0.1:6379> SMEMBERS loggedin
+1) "alice"
+2) "bob"
 
----
+127.0.0.1:6379> SREM loggedin alice
+(integer) 1
 
-### Vote.java
+127.0.0.1:6379> SMEMBERS loggedin
+1) "bob"
 
-* Added `@Entity`.
-* Added `id` field with `@Id` and `@GeneratedValue`.
-* Added relationship to `VoteOption`:
+127.0.0.1:6379> SADD loggedin eve
+(integer) 1
 
-  ```java
-  @ManyToOne
-  private VoteOption votesOn;
-  ```
-* Added relationship to `Poll`:
+127.0.0.1:6379> SMEMBERS loggedin
+1) "bob"
+2) "eve"
 
-  ```java
-  @ManyToOne
-  private Poll poll;
-  ```
+127.0.0.1:6379> SISMEMBER loggedin bob
+(integer) 1
 
----
-
-## Database Configuration and Schema Analysis
-
-### Database Setup for Testing and Inspection
-
-To enable database table inspection during testing, the project was configured to use a file-based H2 database instead of an in-memory database. This allows the database to persist after test execution, making it possible to examine the generated schema and test data.
-
-
-
-The key modification made to the `PollsTest.java` file was changing the JDBC URL from in-memory to file-based storage:
-
-**Before:**
-```java
-.property(PersistenceConfiguration.JDBC_URL, "jdbc:h2:mem:polls")
+127.0.0.1:6379> SISMEMBER loggedin alice
+(integer) 0
 ```
 
-**After:**
-```java
-.property(PersistenceConfiguration.JDBC_URL, "jdbc:h2:file:./build/polls-db")
+* **Expected Behavior**:
+
+    * `alice` and `bob` initially log in.
+    * `alice` logs off, leaving only `bob`.
+    * `eve` logs in, resulting in `bob` and `eve` in the set.
+    * Membership checks confirm `bob` is logged in, but `alice` is not.
+
+---
+
+### Use Case 2: Store Poll Votes (Hash datatype)
+
+* **Goal**: Represent a poll and its vote counts using a Redis Hash.
+
+* **Explanation**:
+
+    * Hashes are key–value maps inside Redis, making them suitable for storing structured data.
+    * Each option’s caption and vote count can be stored under separate fields.
+    * Vote counts can be incremented atomically with `HINCRBY`, avoiding the need to rewrite the entire object.
+
+* **Commands and Results**:
+
+```
+127.0.0.1:6379> HSET poll:03ebcb7b:id id "03ebcb7b"
+(integer) 1
+
+127.0.0.1:6379> HSET poll:03ebcb7b:title title "Pineapple on Pizza?"
+(integer) 1
+
+127.0.0.1:6379> HSET poll:03ebcb7b:options 0 "Yes, yammy!" 1 "Mamma mia, nooooo!" 2 "I do not really care ..."
+(integer) 3
+
+127.0.0.1:6379> HSET poll:03ebcb7b:counts 0 269 1 268 2 42
+(integer) 3
+
+127.0.0.1:6379> HINCRBY poll:03ebcb7b:counts 0 1
+(integer) 270
+
+127.0.0.1:6379> HGETALL poll:03ebcb7b:counts
+1) "0"
+2) "270"
+3) "1"
+4) "268"
+5) "2"
+6) "42"
 ```
 
-This change creates a physical database file at `DAT250-Assigment4/build/polls-db.mv.db` that persists after test execution.
+* **Expected Behavior**:
 
-### Database Connection in IntelliJ
+    * Poll metadata and options are stored in hash structures.
+    * Initial vote counts are set.
+    * Incrementing the vote count for option `0` increases its total from `269` to `270`.
+    * The final hash shows updated counts for all options.
 
-The H2 database can be accessed through IntelliJ's Database tool window using the following connection parameters:
-- **URL**: `jdbc:h2:file:./build/polls-db`
-- **User**: `sa`
-- **Password**: (empty)
+---
 
-## Database Schema Analysis
+### Java Implementation
 
-Hibernate automatically generated the following tables based on the JPA entity mappings:
+A Java class `RedisUseCaseTests` was created under `src/test/java/com/Assigment5/DAT250Assigment5`.
+This class reproduces the CLI operations programmatically using **Jedis** (`JedisPooled` client).
 
-### 1. USERS Table
-- **Purpose**: Stores user information
-- **Columns**:
-    - `id` (Primary Key): Auto-generated user identifier
-    - `username`: Unique username for each user
-    - `email`: User's email address
-- **Relationships**: Serves as the owner of polls through the application logic
+* **Structure**:
 
-![USERSTable](images/users-table.png)
+    * `useCase1()`: Implements the Set operations for logged-in users.
+    * `useCase2()`: Implements the Hash operations for poll vote counts.
+    * `main()`: Calls both use cases sequentially.
 
-### 2. POLL Table
-- **Purpose**: Stores poll definitions and metadata
-- **Columns**:
-    - `id` (Primary Key): Auto-generated poll identifier
-    - `question`: The poll question text
-    - `created_by`: References the user who created the poll (implied by application logic)
-    - Additional metadata columns for timestamps and status
-- **Relationships**:
-    - One-to-Many with `VOTEOPTION` (a poll has multiple voting options)
-    - One-to-Many with `VOTE` (a poll collects multiple votes)
+* **Execution**:
 
-![POLLTable](images/poll-table.png)
+    * Right-click on `RedisUseCaseTests` → **Run 'RedisUseCaseTests.main()'** in IntelliJ.
+    * Expected output matches the CLI results, e.g.:
 
-### 3. VOTEOPTION Table
-- **Purpose**: Stores the available voting options for each poll
-- **Columns**:
-    - `id` (Primary Key): Auto-generated option identifier
-    - `caption`: The text description of the voting option
-    - `presentation_order`: Determines the display order of options
-    - `poll_id` (Foreign Key): References the parent poll
-- **Relationships**:
-    - Many-to-One with `POLL` (each option belongs to one poll)
-    - One-to-Many with `VOTE` (each option can receive multiple votes)
+```
+=== USE CASE 1: Logged-in users with SET ===
+Initial state: []
+After alice logs in: [alice]
+After bob logs in: [bob, alice]
+After alice logs off: [bob]
+After eve logs in: [bob, eve]
+Is bob logged in? true
+Is alice logged in? false
 
-![VOTEOPTIONTable](images/voteoption-table.png)
-
-### 4. VOTE Table
-- **Purpose**: Records individual votes cast by users
-- **Columns**:
-    - `id` (Primary Key): Auto-generated vote identifier
-    - `user_id` (Foreign Key): References the user who cast the vote
-    - `option_id` (Foreign Key): References the selected voting option
-    - `poll_id` (Foreign Key): References the poll being voted on
-    - `timestamp`: When the vote was cast
-- **Relationships**:
-    - Many-to-One with `USERS` (each vote is cast by one user)
-    - Many-to-One with `VOTEOPTION` (each vote selects one option)
-    - Many-to-One with `POLL` (each vote belongs to one poll)
-
-![VOTETable](images/vote-table.png)
-
-
-### Foreign Key Constraints
-The database maintains referential integrity through foreign key constraints:
-- `VOTE.poll_id → POLL.id`
-- `VOTE.option_id → VOTEOPTION.id`
-- `VOTEOPTION.poll_id → POLL.id`
+=== USE CASE 2: Poll votes with HASH ===
+Meta: {title=Pineapple on Pizza?, id=03ebcb7b}
+Captions: {0=Yes, yammy!, 1=Mamma mia, nooooo!, 2=I do not really care ...}
+Initial counts: {0=269, 1=268, 2=42}
+After one new 'Yes' vote → option 0 count = 270
+Final counts: {0=270, 1=268, 2=42}
+```
 
 
 
 ## Test Scenario
 
-The application supports the following scenario:
+The application supports all previous scenarios (user creation, poll creation, voting, persistence via JPA/H2, etc.).
 
-1. **User Creation**: A new user can be created with username and email.
-2. **Poll Creation**: A user creates a poll with a question.
-3. **Adding Vote Options**: Vote options can be added to the poll with proper `presentationOrder`.
-4. **Voting**: A user can vote for one of the available options.
-5. **Bidirectional Relationships**: Votes and polls are correctly linked to their users and options.
-6. **Persistence Test**: Running `PollsTest` verifies that entities are created, persisted, and queried successfully.
-7. **Frontend–Backend Consistency**: Verified that React frontend correctly interacts with numeric IDs when creating, voting, and deleting polls.
+In addition, for Assignment 5:
 
-👉 In addition, the application also passes all the tests of the previous Assignments.
+1. **Redis CLI Tests**: Verified Redis works locally with commands `PING`, `SET`, `GET`, `EXPIRE`, `SADD`, `SREM`, `SMEMBERS`, `HSET`, `HGETALL`, and `HINCRBY`.
+2. **Java Jedis Tests**: Verified programmatic access to Redis with Use Case 1 (tracking logged-in users) and Use Case 2 (poll vote counts).
 
 ---
 
@@ -267,6 +204,9 @@ The application supports the following scenario:
 * Code from Assigment 1: [https://github.com/WonderBattle/DAT250-Assigment1](https://github.com/WonderBattle/DAT250-Assigment1)
 * Code from Assigment 2: [https://github.com/WonderBattle/DAT250-Assigment2](https://github.com/WonderBattle/DAT250-Assigment2)
 * Code from Assigment 3: [https://github.com/WonderBattle/DAT250-Assigment3](https://github.com/WonderBattle/DAT250-Assigment3)
+* Code from Assigment 4: [https://github.com/WonderBattle/DAT250-Assigment4](https://github.com/WonderBattle/DAT250-Assigment4)
+* Code from Assigment 5: [https://github.com/WonderBattle/DAT250-Assigment5](https://github.com/WonderBattle/DAT250-Assigment5)
+
 
 ---
 
