@@ -1,0 +1,126 @@
+### ==============================================
+### DAT250 Assignment 2 - Complete Test Scenario
+### ==============================================
+
+### Step 1: List all users (empty at first)
+GET http://localhost:8080/users
+
+### Step 2: Create a new user (User 1)
+POST http://localhost:8080/users
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "email": "alice@example.com"
+}
+
+### Step 3: List all users (-> shows the newly created user)
+GET http://localhost:8080/users
+
+### Step 4: Create another user (User 2)
+POST http://localhost:8080/users
+Content-Type: application/json
+
+{
+  "username": "bob",
+  "email": "bob@example.com"
+}
+
+### Step 5: List all users again (-> shows two users)
+GET http://localhost:8080/users
+
+### Step 6: User 1 creates a new poll
+### First, copy Alice's ID from Step 3 or 5 response
+POST http://localhost:8080/polls
+Content-Type: application/json
+
+{
+  "question": "What's your favorite color?",
+  "publishedAt": "2024-01-15T10:00:00Z",
+  "validUntil": "2024-01-22T10:00:00Z",
+  "creator": {
+    "id": "5e8b591d-3857-4c27-b5ba-d4486efaff3a",
+    "username": "alice",
+    "email": "alice@example.com"
+  }
+}
+
+### Step 7: List polls (-> shows the new poll)
+GET http://localhost:8080/polls
+
+### Step 8: Create vote options for the poll
+### First, copy the poll ID from Step 6 or 7 response
+POST http://localhost:8080/voteoptions
+Content-Type: application/json
+
+{
+  "caption": "Red",
+  "presentationOrder": 1,
+  "poll": {
+    "id": "ed3d5d20-1426-4b56-bdab-b6a25ac27091"
+  }
+}
+
+###
+POST http://localhost:8080/voteoptions
+Content-Type: application/json
+
+{
+  "caption": "Blue",
+  "presentationOrder": 2,
+  "poll": {
+    "id": "ed3d5d20-1426-4b56-bdab-b6a25ac27091"
+  }
+}
+
+### Step 9: User 2 votes on the poll (votes for Red)
+### Copy Bob's ID and the Red vote option ID
+POST http://localhost:8080/votes
+Content-Type: application/json
+
+{
+  "user": {
+    "id": "74b352d5-8833-498c-9a5a-719a9159ce9b",
+    "username": "bob",
+    "email": "bob@example.com"
+  },
+  "voteOption": {
+    "id": "aaa477f7-cf11-4f21-8cf9-0d25a50da431",
+    "caption": "Red"
+  }
+}
+
+### Step 10: List votes (-> shows Bob's vote for Red)
+GET http://localhost:8080/votes
+
+### Step 11: User 2 changes his vote (changes to Blue)
+### Copy the Blue vote option ID
+POST http://localhost:8080/votes
+Content-Type: application/json
+
+{
+  "user": {
+    "id": "74b352d5-8833-498c-9a5a-719a9159ce9b",
+    "username": "bob",
+    "email": "bob@example.com"
+  },
+  "voteOption": {
+    "id": "c1abbea7-3a17-4065-827a-0cdfcabb8f41",
+    "caption": "Blue"
+  }
+}
+
+### Step 12: List votes again (-> shows the most recent vote for User 2 - Blue)
+GET http://localhost:8080/votes
+
+### Step 13: Delete the poll
+DELETE http://localhost:8080/polls/ed3d5d20-1426-4b56-bdab-b6a25ac27091
+
+### Step 14: List votes again (-> should be empty since poll was deleted)
+GET http://localhost:8080/votes
+
+### Step 15: Final check - List polls (should be empty)
+GET http://localhost:8080/polls
+
+### Step 16: Final check - List users (should still have both users)
+GET http://localhost:8080/users

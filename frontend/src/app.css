@@ -1,0 +1,371 @@
+/* =========================
+   Global design system
+   ========================= */
+
+/* 1) CSS variables (design tokens) — easy to theme from one place */
+:root {
+    --primary-blue: #3498db;         /* Main accent color (buttons, highlights) */
+    --primary-green: #27ae60;        /* Success action (create, confirm) */
+    --primary-red: #e74c3c;          /* Destructive action (remove option) */
+    --dark-text: #2c3e50;            /* Main text color */
+    --medium-text: #7f8c8d;          /* Secondary text color */
+    --light-bg: #f5f7fb;             /* Page background */
+    --card-bg: #ffffff;              /* Cards / panels background */
+    --border-color: #ecf0f1;         /* Light borders */
+    --shadow: 0 6px 18px rgba(0,0,0,0.08); /* Soft global shadow */
+    --radius: 14px;                  /* Consistent roundness */
+    --radius-sm: 8px;                /* Smaller radius for inputs/buttons */
+    --spacing: 16px;                 /* Base spacing unit */
+    --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; /* Fast, clean font stack */
+}
+
+/* 2) Minimal reset for predictable sizing and spacing */
+* { box-sizing: border-box; }      /* Include borders in width/height calculations */
+html, body { margin: 0; padding: 0; } /* Remove default margins */
+img { max-width: 100%; display: block; } /* Make images responsive */
+
+/* 3) Global body styles */
+body {
+    font-family: var(--font);                  /* Use our font stack */
+    color: var(--dark-text);                   /* Set text color */
+    background: var(--light-bg);               /* Page background */
+    line-height: 1.5;                          /* Comfortable line height */
+    -webkit-font-smoothing: antialiased;       /* Font smoothing (WebKit) */
+    -moz-osx-font-smoothing: grayscale;        /* Font smoothing (Firefox/macOS) */
+}
+
+/* =========================
+   App shell (header + nav)
+   ========================= */
+
+/* 4) App header bar */
+.app-header {
+    width: 100%;                               /* Full width */
+    background: linear-gradient(135deg, #3ba6ee, #1f78c1); /* Subtle gradient */
+    color: white;                               /* White text */
+    padding: 28px 16px;                         /* Comfortable vertical padding */
+    box-shadow: var(--shadow);                  /* Drop shadow for depth */
+}
+
+/* 5) App title text */
+.app-title {
+    text-align: center;                         /* Centered title */
+    font-size: 28px;                            /* Large title size */
+    font-weight: 800;                           /* Bold weight */
+    letter-spacing: 0.4px;                      /* Slight tracking */
+    margin: 0;                                  /* Remove default h1 margin */
+}
+
+/* 6) Top navigation (view switcher) */
+.top-nav {
+    display: flex;                              /* Place buttons in a row */
+    gap: 12px;                                  /* Space between buttons */
+    justify-content: center;                    /* Center the group */
+    align-items: center;                        /* Vertical alignment */
+    padding: 18px 0 24px;                       /* Space around nav */
+}
+
+/* 7) Nav button base style */
+.nav-btn {
+    background: #fff;                           /* White background */
+    color: var(--primary-blue);                 /* Blue text */
+    border: 2px solid var(--primary-blue);      /* Blue border */
+    border-radius: var(--radius-sm);            /* Rounded corners */
+    padding: 10px 16px;                         /* Button padding */
+    font-weight: 700;                           /* Strong label */
+    cursor: pointer;                            /* Pointer cursor */
+    transition: transform .1s ease,             /* Quick press animation */
+    background .2s ease,
+    color .2s ease,
+    border-color .2s ease;
+}
+
+/* 8) Hover and active states for nav buttons */
+.nav-btn:hover {
+    background: var(--primary-blue);            /* Blue background on hover */
+    color: white;                               /* White text on hover */
+}
+.nav-btn:active {
+    transform: translateY(1px);                 /* Tiny press-down effect */
+}
+
+/* =========================
+   Layout containers
+   ========================= */
+
+/* 9) Centered main container with max width */
+.container {
+    max-width: 960px;                           /* Readable width */
+    margin: 0 auto;                             /* Center horizontally */
+    padding: 0 16px;                            /* Side padding on small screens */
+}
+
+/* 10) Card (panel) wrapper — used around each component’s content */
+.card {
+    background: var(--card-bg);                 /* White background */
+    border: 1px solid var(--border-color);      /* Soft border */
+    border-radius: var(--radius);               /* Rounded corners */
+    box-shadow: var(--shadow);                  /* Drop shadow */
+    padding: 22px;                               /* Inside padding */
+}
+
+/* 11) Card header titles */
+.card h2, .card h3 {
+    margin-top: 0;                               /* Remove default top margin */
+    margin-bottom: 10px;                         /* Space below title */
+    font-weight: 800;                            /* Bold heading */
+}
+
+/* =========================
+   Forms
+   ========================= */
+
+/* 12) Stack form fields with consistent spacing */
+.form {
+    display: grid;                               /* Use grid layout */
+    gap: 14px;                                   /* Space between fields */
+}
+
+/* 13) Label styling */
+.label {
+    display: block;                              /* Full width label */
+    font-weight: 700;                            /* Bold label */
+    margin-bottom: 6px;                          /* Gap to input */
+    color: var(--dark-text);                     /* Dark text */
+}
+
+/* 14) Inputs + textarea unified look */
+.input, .textarea {
+    width: 100%;                                 /* Expand to container width */
+    padding: 12px 12px;                          /* Comfortable padding */
+    border: 2px solid var(--border-color);       /* Light border */
+    border-radius: var(--radius-sm);             /* Slightly rounded */
+    font-size: 16px;                             /* Readable font size */
+    outline: none;                               /* Remove default outline */
+    transition: border-color .2s ease,           /* Focus glow effect */
+    box-shadow .2s ease;
+    background: #fff;                            /* White background */
+}
+
+/* 15) Focused input state */
+.input:focus, .textarea:focus {
+    border-color: var(--primary-blue);           /* Blue border on focus */
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.18); /* Soft blue glow */
+}
+
+/* 16) Helper text under fields */
+.help-text {
+    font-size: 13px;                             /* Smaller text */
+    color: var(--medium-text);                   /* Medium tone */
+    margin-top: -2px;                            /* Pull a bit closer */
+}
+
+/* =========================
+   Buttons
+   ========================= */
+
+/* 17) Base button */
+.btn {
+    display: inline-flex;                        /* Align label/icons horizontally */
+    align-items: center;                         /* Center vertically */
+    justify-content: center;                     /* Center horizontally */
+    gap: 8px;                                    /* Space between icon and label */
+    padding: 12px 16px;                          /* Button padding */
+    border-radius: var(--radius-sm);             /* Rounded corners */
+    border: none;                                /* Remove border (variants add it) */
+    font-weight: 800;                            /* Bold label */
+    cursor: pointer;                             /* Pointer on hover */
+    transition: transform .1s ease,              /* Press effect */
+    background .2s ease,
+    color .2s ease,
+    box-shadow .2s ease;
+}
+
+/* 18) Primary (green) */
+.btn-primary {
+    background: var(--primary-green);            /* Green background */
+    color: #fff;                                 /* White text */
+    box-shadow: var(--shadow);                   /* Slight shadow */
+}
+.btn-primary:hover { background: #229954; }    /* Darker on hover */
+.btn-primary:active { transform: translateY(1px); } /* Press effect */
+
+/* 19) Secondary (blue outline) */
+.btn-secondary {
+    background: #fff;                             /* White background */
+    color: var(--primary-blue);                   /* Blue text */
+    border: 2px solid var(--primary-blue);        /* Blue outline */
+}
+.btn-secondary:hover {
+    background: var(--primary-blue);              /* Blue fill on hover */
+    color: #fff;                                  /* White text on hover */
+}
+
+/* 20) Destructive (red) */
+.btn-danger {
+    background: var(--primary-red);               /* Red background */
+    color: #fff;                                  /* White text */
+}
+.btn-danger:hover { background: #c0392b; }      /* Darker red on hover */
+
+/* 21) Small icon-like round button (for remove option “×”) */
+.icon-btn {
+    width: 34px;                                  /* Circle size */
+    height: 34px;
+    border-radius: 50%;                           /* Make it round */
+    display: inline-flex;                         /* Center the “×” */
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;                              /* Larger glyph */
+    border: none;                                 /* No border */
+    cursor: pointer;                              /* Pointer cursor */
+    background: var(--primary-red);               /* Red background */
+    color: #fff;                                  /* White glyph */
+    transition: background .2s ease, transform .1s ease;
+}
+.icon-btn:hover { background: #c0392b; }        /* Darker on hover */
+.icon-btn:active { transform: translateY(1px); }/* Press effect */
+
+/* 22) Full-width action (e.g. “Create Poll”) */
+.btn-block { width: 100%; }                     /* Stretch to container width */
+
+.delete-btn {
+    background: var(--primary-red);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    margin-left: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.delete-btn:hover {
+    background: #c0392b;
+}
+
+.unvote-btn {
+    background: var(--primary-red);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s ease;
+}
+.unvote-btn:hover {
+    background: #c0392b;
+}
+
+/* =========================
+   Poll list + options
+   ========================= */
+
+/* 23) Grid for poll cards */
+.polls-grid {
+    display: grid;                                /* Grid layout for cards */
+    gap: 16px;                                    /* Space between cards */
+    grid-template-columns: 1fr;                   /* 1 column by default */
+}
+@media (min-width: 720px) {
+    .polls-grid { grid-template-columns: 1fr 1fr; } /* 2 columns on larger screens */
+}
+
+/* 24) Poll card styles */
+.poll-card {
+    background: var(--card-bg);                   /* White background */
+    border: 1px solid var(--border-color);        /* Light border */
+    border-radius: var(--radius);                 /* Rounded corners */
+    box-shadow: var(--shadow);                    /* Shadow */
+    padding: 18px;                                /* Inner padding */
+}
+
+/* 25) Small meta row under question */
+.meta {
+    color: var(--medium-text);                    /* Muted text */
+    font-size: 14px;                              /* Smaller font */
+    margin-bottom: 8px;                           /* Spacing below */
+}
+
+/* 26) Vote options list inside a poll */
+.options-list {
+    list-style: none;                             /* Remove bullets */
+    margin: 0;                                    /* Reset margin */
+    padding: 0;                                   /* Reset padding */
+    display: grid;                                /* Grid for options */
+    gap: 10px;                                    /* Space between options */
+}
+
+/* 27) Option line item */
+.option-item {
+    display: flex;                                /* Align caption + button */
+    align-items: center;                          /* Center vertically */
+    justify-content: space-between;               /* Caption left, button right */
+    padding: 10px 12px;                           /* Inner padding */
+    border: 1px solid var(--border-color);        /* Light border */
+    border-radius: var(--radius-sm);              /* Rounded corners */
+    background: #fff;                             /* White background */
+    word-break: break-word;                       /* Controls longs options */
+    overflow-wrap: break-word;                    /* Controls longs options */
+}
+
+.option-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;                                /* Prevents buttons from shrinking */
+    margin-left: 10px;                             /* Space between text and buttons */
+}
+
+.option-text {
+    flex: 1;                                        /* Takes available space */
+    min-width: 0;                                   /* Allows text wrapping */
+    margin-right: 10px;                             /* Space before buttons */
+}
+
+/* 28) Vote count badge */
+.count-badge {
+    display: inline-block;                        /* Inline pill */
+    background: #eef6ff;                          /* Light blue pill */
+    color: #1f78c1;                               /* Blue text */
+    border: 1px solid #d7ebff;                    /* Soft border */
+    padding: 2px 8px;                             /* Pill padding */
+    border-radius: 999px;                         /* Fully rounded */
+    font-size: 12px;                              /* Small font */
+}
+
+/* 29) Messages (success / error) */
+.message {
+    margin-top: 10px;                             /* Space from previous element */
+    padding: 10px 12px;                           /* Inner padding */
+    border-radius: var(--radius-sm);              /* Rounded corners */
+    font-weight: 600;                             /* Slightly bolder */
+}
+.message-success {
+    background: #eafaf1;                          /* Light green bg */
+    color: #186a3b;                               /* Dark green text */
+    border: 1px solid #c8e6d0;                    /* Green-ish border */
+}
+.message-error {
+    background: #fdecea;                          /* Light red bg */
+    color: #7b241c;                               /* Dark red text */
+    border: 1px solid #f5c6cb;                    /* Red-ish border */
+}
+
+.user-greeting {
+    margin-top: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--dark-text);
+}
+
+/* =========================
+   Spacing helpers
+   ========================= */
+
+/* 30) Small spacing utilities to avoid inline styles */
+.mt-8 { margin-top: 8px; }                      /* Margin top 8px */
+.mt-12 { margin-top: 12px; }                    /* Margin top 12px */
+.mt-16 { margin-top: 16px; }                    /* Margin top 16px */
+.mb-8 { margin-bottom: 8px; }                   /* Margin bottom 8px */
+.mb-12 { margin-bottom: 12px; }                 /* Margin bottom 12px */
+.mb-16 { margin-bottom: 16px; }                 /* Margin bottom 16px */
