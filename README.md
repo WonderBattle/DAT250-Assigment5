@@ -1,4 +1,4 @@
-# Poll App - DAT250 Assignment 4
+# Poll App - DAT250 Assignment 5
 
 A fullstack web application combining a **Spring Boot backend** and a **Svelte/Vite frontend**.
 The frontend is built and automatically served by Spring Boot.
