@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This assignment extends the poll application by integrating **Redis (Valkey)** as an in-memory data store.
+This assignment extends the poll application by integrating **Redis** as an in-memory data store.
 I successfully installed Redis locally, verified its operation through the CLI (`redis-cli`), and explored Redis datatypes such as **Strings**, **Sets**, and **Hashes**.
 
 Three specific use cases were implemented and tested:

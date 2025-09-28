@@ -2,7 +2,7 @@
 
 A fullstack web application combining a **Spring Boot backend** and a **Svelte/Vite frontend**.
 The frontend is built and automatically served by Spring Boot.
-This project extends **Assignment 3** by adding **persistence with JPA and Hibernate**.
+This project extends **Assignment 4** by adding **Redis integration** for caching and experimenting with Redis datatypes.
 
 ---
 
@@ -12,7 +12,10 @@ This project extends **Assignment 3** by adding **persistence with JPA and Hiber
 * Poll creation and voting
 * Vote options with proper relationships
 * RESTful API endpoints
-* Automated testing (unit + persistence)
+* Redis integration with **Jedis** client
+* Redis use cases: tracking logged-in users and poll vote counts
+* Cache for aggregated poll results
+* Automated testing (unit + Redis use case tests)
 * API documentation with Swagger UI
 * Continuous Integration with GitHub Actions
 * H2 in-memory database for local development
@@ -30,6 +33,12 @@ This project extends **Assignment 3** by adding **persistence with JPA and Hiber
 @GeneratedValue(strategy = GenerationType.IDENTITY)
 private Long id;
 ```
+
+* Redis is used to:
+
+    * **Track logged-in users** with the `Set` datatype.
+    * **Store poll vote counts** with the `Hash` datatype.
+    * **Cache aggregated poll results** (`poll:{id}:votes`) to avoid expensive SQL queries.
 
 ---
 
@@ -49,6 +58,8 @@ Once the application is running, visit:
 ```
 
 The backend will start on **[http://localhost:8080](http://localhost:8080)** and serve the frontend automatically.
+
+Make sure **Redis server** is running locally (`redis-server`) before starting the app.
 
 ---
 
@@ -70,6 +81,20 @@ Run them with:
 ```
 
 All entities (`User`, `Poll`, `VoteOption`, `Vote`) are created, persisted, and queried as part of these tests.
+
+### Redis tests
+
+A dedicated test class `RedisUseCaseTests` replicates Redis CLI commands programmatically using Jedis.
+It demonstrates:
+
+* **Use Case 1**: Tracking logged-in users with `SADD`, `SREM`, `SMEMBERS`, and `SISMEMBER`.
+* **Use Case 2**: Storing and incrementing poll votes with `HSET`, `HGETALL`, and `HINCRBY`.
+
+Run them directly from IntelliJ or via:
+
+```bash
+./gradlew test --tests "*RedisUseCaseTests"
+```
 
 ---
 
