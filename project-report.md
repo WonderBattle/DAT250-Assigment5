@@ -3,14 +3,16 @@
 ## Project Overview
 
 This assignment extends the poll application by integrating **Redis (Valkey)** as an in-memory data store.
-We successfully installed Redis locally, verified its operation through the CLI (`redis-cli`), and explored Redis datatypes such as **Strings**, **Sets**, and **Hashes**.
+I successfully installed Redis locally, verified its operation through the CLI (`redis-cli`), and explored Redis datatypes such as **Strings**, **Sets**, and **Hashes**.
 
-Two specific use cases were implemented and tested:
+Three specific use cases were implemented and tested:
 
 1. **Tracking logged-in users** using Redis Sets.
 2. **Storing and updating poll vote counts** using Redis Hashes.
+3. **Implementing a cache for poll results**: vote counts are now cached in Redis, avoiding repeated aggregation queries against the relational database.
 
-Additionally, we reproduced these same tests in **Java** using the Jedis library, ensuring that the application can interact programmatically with Redis.
+Additionally, I reproduced these same tests in **Java** using the Jedis library, ensuring that the application can interact programmatically with Redis.
+The cache implementation was integrated directly into the application’s `PollManager` and exposed via REST endpoints.
 
 ---
 
@@ -39,17 +41,42 @@ Then refreshed Gradle to fetch the dependency.
 ```bash
 redis-cli PING
 ```
+
 Expected response: `PONG`.
+
+---
+
+### 3. **Synchronizing Cache and Database**
+
+**Problem**: After introducing Redis as a cache for poll results, new votes were correctly stored in the database but not reflected in Redis.
+
+**Solution**: Updated the `PollManager` so that every time a vote is registered, the corresponding Redis hash is incremented using `HINCRBY`.
+This ensures that Redis and the relational database stay consistent.
+
+---
+
+### 4. **Interpreting Cache vs. Database Results**
+
+**Problem**: At first it was not clear how to verify if the cache was being used instead of the database aggregation query.
+
+**Solution**: We confirmed cache usage by:
+
+* Checking `redis-cli` directly with `HGETALL poll:<id>:votes` to see updated counts.
+* Comparing responses from `/polls/{id}/results` before and after caching logic.
+
+If Redis contained the key, the endpoint returned results immediately; if not, the backend fell back to the database query and populated Redis for subsequent requests.
 
 ---
 
 ## Changes made to the base project
 
 * Added **Jedis dependency** to `build.gradle` for Redis integration.
-* Created a new test class `RedisUseCaseTests` under `src/test/java/no/ntnu/dat250/expass5/`.
-* This class replicates the CLI Redis operations for Use Case 1 (tracking logged-in users) and Use Case 2 (poll vote counts).
+* Created a new test class `RedisUseCaseTests` under `src/test/java/com/Assigment5/DAT250Assigment5`. This class replicates the CLI Redis operations for Use Case 1 (tracking logged-in users) and Use Case 2 (poll vote counts).
+* Extended the `PollManager` with:
 
-No changes were required in the existing poll application source code yet, since this step focuses only on testing Redis basics.
+    * Methods to update Redis whenever a vote is cast.
+    * Methods to fetch poll results from Redis if available, otherwise compute from the database and then store them in Redis.
+* Created a new REST controller endpoint `/polls/{id}/results` that retrieves cached results (if present) or falls back to the database.
 
 ---
 
@@ -186,7 +213,66 @@ After one new 'Yes' vote → option 0 count = 270
 Final counts: {0=270, 1=268, 2=42}
 ```
 
+### Implementing Cache for Poll Results
 
+* **Goal**: Avoid running the expensive aggregation query every time a client requests poll results.
+
+
+* **Explanation**:
+
+    * A Redis Hash stores the vote counts for each option in a poll.
+    * When a client requests `/polls/{id}/results`:
+
+        * If Redis contains the hash, the results are returned directly.
+        * If Redis does not contain the hash, the system queries the database, aggregates results, returns them, and **stores them in Redis** for faster subsequent access.
+    * When a new vote is cast, the corresponding Redis entry is updated immediately with `HINCRBY`, ensuring consistency.
+
+
+* **How to test using the UI**:
+
+    1. Create a **user** (e.g., Alice).
+    2. Create a **poll** with options (e.g., “Pineapple on Pizza?”).
+    3. Cast **votes** for one or more options.
+    4. Check the results via the UI at `/polls/{pollId}/results`.
+
+        * First request will likely hit the database, but results are also stored in Redis.
+    5. Open `redis-cli` and run:
+
+       ```
+       HGETALL poll:<pollId>:votes
+       ```
+
+       You should see each `presentationOrder` and its vote count.
+    6. Cast additional votes and confirm that:
+
+        * The numbers in Redis update automatically.
+        * The results endpoint responds instantly without hitting the database.
+
+
+* **Before vs After Cache Comparison**:
+
+    * **Before**: Every call to `/polls/{id}/results` triggered the SQL query:
+
+      ```sql
+      SELECT o.presentationOrder, COUNT(v.id)
+      FROM vote_options o
+      INNER JOIN votes v on o.id = v.voted_on
+      WHERE o.poll = ?
+      GROUP BY o.presentationOrder
+      ORDER BY o.presentationOrder;
+      ```
+
+      This aggregation ran even if the poll had already been fetched moments earlier.
+
+    * **After**: The same endpoint now first checks Redis:
+
+        * If cached → returns results immediately in O(1).
+        * If not cached → runs the SQL query once, caches the result, and reuses it.
+
+  This drastically reduces database load when results are requested frequently.
+
+
+---
 
 ## Test Scenario
 
@@ -196,6 +282,12 @@ In addition, for Assignment 5:
 
 1. **Redis CLI Tests**: Verified Redis works locally with commands `PING`, `SET`, `GET`, `EXPIRE`, `SADD`, `SREM`, `SMEMBERS`, `HSET`, `HGETALL`, and `HINCRBY`.
 2. **Java Jedis Tests**: Verified programmatic access to Redis with Use Case 1 (tracking logged-in users) and Use Case 2 (poll vote counts).
+3. **Cache Integration Tests**: Verified that:
+
+    * `/polls/{id}/results` first checks Redis.
+    * New votes update both the database and Redis immediately.
+    * Results are faster on subsequent requests thanks to caching.
+
 
 ---
 
@@ -212,70 +304,65 @@ In addition, for Assignment 5:
 
 ## Key Features Implemented
 
-### ✅ Entity Annotations
+### ✅ Redis Integration
 
-* `@Entity` added to `Poll`, `VoteOption`, `Vote`, and `User`.
-* `@Id` and `@GeneratedValue` for primary keys.
+* Jedis dependency added to Gradle.
+* Redis connection pool established for Java usage.
 
-### ✅ Relationships
+### ✅ Redis Use Cases
 
-* **Poll ↔ Vote**: One-to-many, mapped by `poll`.
-* **Poll ↔ VoteOption**: One-to-many, mapped by `poll`.
-* **VoteOption ↔ Vote**: One-to-many, mapped by `votesOn`.
-* **Vote ↔ VoteOption**: Many-to-one with join column `option_id`.
-* **Vote ↔ Poll**: Many-to-one with implicit join column `poll_id`.
+* **Set datatype** used to track logged-in users.
+* **Hash datatype** used to store poll vote counts.
 
-### ✅ Database Schema
+### ✅ Cache Implementation
 
-Hibernate automatically generated the following tables in H2:
+* `PollManager` extended to:
 
-* `poll`
-* `vote_option`
-* `vote`
-* `user`
+    * Store poll results in Redis Hashes.
+    * Fetch results from cache when available.
+    * Invalidate/update Redis counts when new votes are cast.
+* New endpoint `/polls/{id}/results` returns cached results when possible.
 
-Foreign keys:
+### ✅ Verification
 
-* `vote.poll_id → poll.id`
-* `vote.option_id → vote_option.id`
-* `vote_option.poll_id → poll.id`
-
-### ✅ Frontend Integration
-
-* Adapted React code to properly send and handle numeric (`Long`) IDs.
-* Fixed duplicated vote option issue by cleaning up relationship handling in backend.
+* Results tested both via **UI** and **redis-cli**.
+* Confirmed consistency between relational DB and Redis data.
 
 ---
 
 ## Pending Issues
 
-### 1. **Column Naming**
+### 1. **Time-to-Live (TTL)**
 
-Currently relying on Hibernate’s default column names. For production, explicit `@JoinColumn(name = "...")` annotations should be standardized.
+Currently cached poll results in Redis never expire. A TTL policy could be added to avoid stale entries for long-closed polls.
 
-### 2. **Validation**
+### 2. **Cache Invalidation for Poll Deletion**
 
-No validation annotations (`@NotNull`, `@Size`) implemented yet for entity fields.
+If a poll is deleted from the database, its Redis entry remains. A cleanup mechanism is needed.
 
-### 3. **Cascade Deletes**
+### 3. **Scalability Considerations**
 
-Although cascading works for some relationships, deletion scenarios (e.g., removing a `Poll`) need more thorough testing.
+The cache implementation works for a single Redis instance. For larger deployments, clustering or replication should be considered.
 
-### 4. **PollManager**
+### 4. **Spring Data Redis Integration**
 
-Still uses in-memory `HashMap` storage for certain operations. Full migration to JPA repositories would simplify persistence handling.
+Instead of using Jedis directly, the project could adopt **Spring Data Redis**. This would simplify cache handling by using Spring’s `RedisTemplate` or built-in cache abstraction with annotations like `@Cacheable`.
 
-### 5. **Warnings in Tests**
+### 5. **Redis Cluster and Sharding**
 
-Some warnings appear when running GitHub Actions tests (mainly from old `requests.http` UUID IDs), but all tests pass correctly. These should be aligned with `Long` IDs for consistency.
+Setting up a **Redis cluster with multiple nodes** would distribute data across shards. This improves fault tolerance and scalability, but requires deciding on a sharding strategy and verifying data distribution.
+
+### 6. **Redis as Sole Database**
+
+A possible extension is replacing JPA entirely by **serializing domain objects into Redis Hashes or JSON**. This would mean Redis is not only the cache but also the primary database. It requires revisiting persistence logic and ensuring durability.
 
 ---
 
 ## Conclusion
 
-The assignment was successfully completed with a fully working persistence layer for polls, vote options, and votes.
-The main challenges involved adapting entity IDs from `String` to `Long`, fixing missing relationships, solving poll ownership issues, avoiding duplicate vote options, and ensuring frontend–backend consistency.
+The assignment was successfully completed with Redis fully integrated into the poll application.
+I implemented three distinct Redis use cases and, most importantly, extended the application with a **poll results cache**, drastically reducing the number of expensive aggregation queries.
 
-By resolving these, Hibernate correctly generated the database schema, and the provided test case passed.
-This assignment provided valuable experience with JPA, Hibernate mappings, schema inspection in H2, and debugging real-world integration issues across backend and frontend.
+The main challenges involved synchronizing Redis with database changes and confirming cache hits vs. database queries. By resolving these, I achieved a consistent, performant solution.
+This assignment provided valuable experience in caching strategies, database–cache consistency, and practical Redis usage in a real web application.
 
