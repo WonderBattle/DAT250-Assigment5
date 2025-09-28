@@ -6,6 +6,7 @@ import com.Assigment5.DAT250Assigment5.model.Vote;
 import com.Assigment5.DAT250Assigment5.model.VoteOption;
 import org.springframework.stereotype.Component;
 import java.util.*;
+import redis.clients.jedis.JedisPooled;
 
 @Component
 public class PollManager {
@@ -19,6 +20,7 @@ public class PollManager {
     private long voteIdSeq = 1;
     private long voteOptionIdSeq = 1;
 
+    private final JedisPooled jedis = new JedisPooled("localhost", 6379);
 
     // User methods
     public User createUser(User user) {
@@ -195,6 +197,13 @@ public class PollManager {
             }
         }
 
+        // Invalidate cache for this poll (Assigment 5)
+        if (vote.getVoteOption() != null && vote.getVoteOption().getPoll() != null) {
+            Long pollId = vote.getVoteOption().getPoll().getId();
+            String redisKey = "poll:" + pollId + ":votes";
+            jedis.del(redisKey);
+        }
+
         votes.put(vote.getId(), vote); // Store vote in the votes map
         return vote;
     }
@@ -214,6 +223,45 @@ public class PollManager {
 
     public List<Vote> getAllVotes() {
         return new ArrayList<>(votes.values());  // Return copy of all votes as ArrayList
+    }
+
+    //ASSIGMENT 5
+
+    // Get aggregated votes (from cache or compute)
+    public Map<Long, Integer> getVoteCountsForPoll(Long pollId) {
+        String redisKey = "poll:" + pollId + ":votes";
+
+        // 1. Check if cached
+        if (jedis.exists(redisKey)) {
+            System.out.println("Fetching aggregated votes for poll " + pollId + " from Redis cache...");
+            Map<String, String> cached = jedis.hgetAll(redisKey);
+
+            Map<Long, Integer> result = new HashMap<>();
+            cached.forEach((k, v) -> result.put(Long.valueOf(k), Integer.valueOf(v)));
+            return result;
+        }
+
+        // 2. Otherwise, compute manually
+        System.out.println("Computing aggregated votes for poll " + pollId + " from in-memory store...");
+        Map<Long, Integer> counts = new HashMap<>();
+
+        for (Vote vote : votes.values()) {
+            if (vote.getVoteOption() != null && vote.getVoteOption().getPoll().getId().equals(pollId)) {
+                Long optionId = vote.getVoteOption().getId();
+                counts.put(optionId, counts.getOrDefault(optionId, 0) + 1);
+            }
+        }
+
+        // 3. Store in Redis for next time
+        Map<String, String> redisHash = new HashMap<>();
+        counts.forEach((k, v) -> redisHash.put(String.valueOf(k), String.valueOf(v)));
+
+        if (!redisHash.isEmpty()) {
+            jedis.hset(redisKey, redisHash);
+            jedis.expire(redisKey, 60); // cache expires in 60 seconds
+        }
+
+        return counts;
     }
 
 

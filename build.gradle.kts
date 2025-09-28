@@ -54,9 +54,8 @@ dependencies {
     implementation("com.h2database:h2:2.3.232")
 
     // Redis dependencies (Assigment 5)
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    implementation("org.springframework.session:spring-session-data-redis")
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation ("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation ("org.springframework.boot:spring-boot-starter-cache")
     implementation("redis.clients:jedis:6.2.0")
 }
 
