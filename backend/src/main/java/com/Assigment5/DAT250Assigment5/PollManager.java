@@ -20,7 +20,20 @@ public class PollManager {
     private long voteIdSeq = 1;
     private long voteOptionIdSeq = 1;
 
-    private final JedisPooled jedis = new JedisPooled("localhost", 6379);
+    //private final JedisPooled jedis = new JedisPooled("localhost", 6379);
+    private final JedisPooled jedis;
+
+    public PollManager() {
+        JedisPooled tmp = null;
+        try {
+            tmp = new JedisPooled("localhost", 6379);
+            tmp.ping(); // check connectivity
+        } catch (Exception e) {
+            tmp = null;
+            System.err.println("⚠ Redis not available — running without caching. Reason: " + e.getMessage());
+        }
+        this.jedis = tmp;
+    }
 
     // User methods
     public User createUser(User user) {
@@ -197,11 +210,18 @@ public class PollManager {
             }
         }
 
-        // Invalidate cache for this poll (Assigment 5)
+        // Invalidate cache for this poll (Assigment 5) — safe if Redis isn't available
         if (vote.getVoteOption() != null && vote.getVoteOption().getPoll() != null) {
             Long pollId = vote.getVoteOption().getPoll().getId();
             String redisKey = "poll:" + pollId + ":votes";
-            jedis.del(redisKey);
+            if (jedis != null) {
+                try {
+                    jedis.del(redisKey);
+                } catch (Exception e) {
+                    // ignore Redis errors in tests/CI
+                    System.err.println("Warning: Redis DEL failed: " + e.getMessage());
+                }
+            }
         }
 
         votes.put(vote.getId(), vote); // Store vote in the votes map
@@ -231,22 +251,32 @@ public class PollManager {
     public Map<Long, Integer> getVoteCountsForPoll(Long pollId) {
         String redisKey = "poll:" + pollId + ":votes";
 
-        // 1. Check if cached
-        if (jedis.exists(redisKey)) {
-            System.out.println("Fetching aggregated votes for poll " + pollId + " from Redis cache...");
-            Map<String, String> cached = jedis.hgetAll(redisKey);
+        // 1. Try cache if Redis is available
+        if (jedis != null) {
+            try {
+                if (jedis.exists(redisKey)) {
+                    System.out.println("Fetching aggregated votes for poll " + pollId + " from Redis cache...");
+                    Map<String, String> cached = jedis.hgetAll(redisKey);
 
-            Map<Long, Integer> result = new HashMap<>();
-            cached.forEach((k, v) -> result.put(Long.valueOf(k), Integer.valueOf(v)));
-            return result;
+                    Map<Long, Integer> result = new HashMap<>();
+                    cached.forEach((k, v) -> result.put(Long.valueOf(k), Integer.valueOf(v)));
+                    return result;
+                }
+            } catch (Exception e) {
+                // If Redis read fails, fallback to in-memory
+                System.err.println("Warning: Redis read failed — computing in-memory. Reason: " + e.getMessage());
+            }
         }
+
 
         // 2. Otherwise, compute manually
         System.out.println("Computing aggregated votes for poll " + pollId + " from in-memory store...");
         Map<Long, Integer> counts = new HashMap<>();
 
         for (Vote vote : votes.values()) {
-            if (vote.getVoteOption() != null && vote.getVoteOption().getPoll().getId().equals(pollId)) {
+            if (vote.getVoteOption() != null
+                    && vote.getVoteOption().getPoll() != null
+                    && vote.getVoteOption().getPoll().getId().equals(pollId)) {
                 Long optionId = vote.getVoteOption().getId();
                 counts.put(optionId, counts.getOrDefault(optionId, 0) + 1);
             }
@@ -256,10 +286,15 @@ public class PollManager {
         Map<String, String> redisHash = new HashMap<>();
         counts.forEach((k, v) -> redisHash.put(String.valueOf(k), String.valueOf(v)));
 
-        if (!redisHash.isEmpty()) {
-            jedis.hset(redisKey, redisHash);
-            jedis.expire(redisKey, 60); // cache expires in 60 seconds
+        if (!redisHash.isEmpty() && jedis != null) {
+            try {
+                jedis.hset(redisKey, redisHash);
+                jedis.expire(redisKey, 60); // cache expires in 60 seconds
+            } catch (Exception e) {
+                System.err.println("Warning: Redis write failed; continuing without caching. Reason: " + e.getMessage());
+            }
         }
+
 
         return counts;
     }
